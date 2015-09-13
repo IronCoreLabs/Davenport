@@ -66,11 +66,12 @@ class CouchConnectionSpec extends WordSpec with Matchers with BeforeAndAfterAll 
       res.leftValue.getClass should ===(classOf[DocumentAlreadyExistsException])
     }
     "fail to get counter when counter is actually a string" in {
+      import syntax.dbprog._ // bring in syntax for dbprog
       val steps = for {
         _ <- createDoc(k, v)
         c <- getCounter(k)
       } yield c
-      CouchConnection.execTask(steps).attemptRun.value should be(left)
+      steps.execTask(CouchConnection).attemptRun.value should be(left)
     }
     "fail to increment counter when counter is actually a string" in {
       val steps = for {
