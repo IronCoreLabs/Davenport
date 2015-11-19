@@ -170,7 +170,7 @@ abstract class DatastoreSpec extends TestBase {
     "show partial success will still change the backing store" in {
       val datastore = emptyDatastore
       val createOne = createAndGet(k, v)
-      val k2 = Key("something.")
+      val k2 = tenrows.head._1
       val v2 = RawJsonString("thisIsValue")
       val createTwo = createAndGet(k2, v2)
       //Setup the backing store
@@ -214,6 +214,27 @@ abstract class DatastoreSpec extends TestBase {
       val res = runProcess(batch.createDocs(tenrows.drop(5))).value
       res.length shouldBe 5
       res.toList.separate._2.length shouldBe 5
+    }
+    "Scan keys GTE" in {
+      val datastore = emptyDatastore
+      import argonaut._, Argonaut._
+      import DB._
+      import syntax._
+      case class Test(string: String, enabled: Boolean)
+      implicit def codec: CodecJson[Test] = CodecJson.derive[Test]
+      val Seq(k1, k2, k3) = tenrows.take(3).map(_._1)
+      val t1 = Test("blah", true)
+      val str = t1.jencode.nospaces
+      val creates = for {
+        _ <- createDoc(k1, RawJsonString(str))
+        _ <- createDoc(k2, RawJsonString("blah".jencode.nospaces))
+      } yield ()
+      creates.execute(datastore).attemptRun.value
+      Thread.sleep(2000L)
+      val p = scanKeys(db.GTE, k2.value).execute(datastore).attemptRun.value.value
+      val result: IndexedSeq[DBValue] = p.runLog.attemptRun.value
+      result should have length (1)
+      result.headOption.value.key shouldBe k2
     }
   }
 }

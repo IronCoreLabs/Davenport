@@ -8,6 +8,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz._
 import scalaz.syntax.either._
+import scalaz.syntax.order._
 import db._
 
 abstract class MemDatastore extends Datastore {
@@ -102,6 +103,22 @@ object MemDatastore {
     }
   }
 
+  private def findRecords(comparison: Comparison, value: String): KVMap => List[DBValue] = { map: KVMap =>
+    val filterFunc = comparisonToFilter(comparison, value)
+    map.toList.collect { case (key, value) if (filterFunc(key)) => DBDocument(key, genCommitVersion(value), value) }
+  }
+
+  private def comparisonToFilter(comparison: Comparison, value: String): Key => Boolean = {
+    val comparisonKey = Key(value)
+    comparison match {
+      case GTE => _ >= comparisonKey
+      case LTE => _ <= comparisonKey
+      case EQ => _ == comparisonKey
+      case LT => _ < comparisonKey
+      case GT => _ > comparisonKey
+    }
+  }
+
   private def toKVState: DBOp ~> KVState = new (DBOp ~> KVState) {
     def apply[A](op: DBOp[A]): KVState[A] = {
       op match {
@@ -117,6 +134,9 @@ object MemDatastore {
         }
         case GetCounter(k) => getCounter(k)
         case IncrementCounter(k, delta) => incrementCounter(k, delta)
+        case ScanKeys(comparison, value) => state { map =>
+          map -> scalaz.stream.Process.emitAll(findRecords(comparison, value)(map)).right
+        }
       }
     }
   }
