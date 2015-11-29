@@ -218,7 +218,7 @@ abstract class DatastoreSpec extends TestBase {
     "Scan keys GTE" in {
       val datastore = emptyDatastore
       import argonaut._, Argonaut._
-      import DB._
+      import db._
       import syntax._
       case class Test(string: String, enabled: Boolean)
       implicit def codec: CodecJson[Test] = CodecJson.derive[Test]
@@ -231,7 +231,7 @@ abstract class DatastoreSpec extends TestBase {
       } yield ()
       creates.execute(datastore).attemptRun.value
       Thread.sleep(2000L)
-      val p = scanKeys(db.GTE, k2.value).execute(datastore).attemptRun.value.value
+      val p = scanKeys(GTE, k2.value).execute(datastore).attemptRun.value.value
       val result: IndexedSeq[DBValue] = p.runLog.attemptRun.value
       result should have length (1)
       result.headOption.value.key shouldBe k2
