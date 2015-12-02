@@ -215,26 +215,45 @@ abstract class DatastoreSpec extends TestBase {
       res.length shouldBe 5
       res.toList.separate._2.length shouldBe 5
     }
-    "Scan keys GTE" in {
-      val datastore = emptyDatastore
+
+    "handle scans" should {
       import argonaut._, Argonaut._
-      import db._
-      import syntax._
       case class Test(string: String, enabled: Boolean)
-      implicit def codec: CodecJson[Test] = CodecJson.derive[Test]
+      implicit val codec: CodecJson[Test] = CodecJson.derive[Test]
       val Seq(k1, k2, k3) = tenrows.take(3).map(_._1)
       val t1 = Test("blah", true)
-      val str = t1.jencode.nospaces
-      val creates = for {
-        _ <- createDoc(k1, RawJsonString(str))
-        _ <- createDoc(k2, RawJsonString("blah".jencode.nospaces))
-      } yield ()
-      creates.execute(datastore).attemptRun.value
-      Thread.sleep(2000L)
-      val p = scanKeys(GTE, k2.value).execute(datastore).attemptRun.value.value
-      val result: IndexedSeq[DBValue] = p.runLog.attemptRun.value
-      result should have length (1)
-      result.headOption.value.key shouldBe k2
+      val createData = List(k1 -> RawJsonString(t1.jencode.nospaces), k2 -> RawJsonString("blah".jencode.nospaces), k3 -> RawJsonString(0L.jencode.nospaces))
+      val creates = createData.traverseU { case (key, value) => createDoc(key, value) }
+
+      def runScan(c: Comparison, d: Datastore): DBError \/ List[(Key, RawJsonString)] = {
+        val resultDisjunction = scanKeys(c, k2.value, -100, -1, EnsureConsistency).execute(d).attemptRun.value
+        resultDisjunction.map(_.sortBy(_.key).map(r => r.key -> r.data))
+      }
+      "be correct for GTE" in {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        runScan(GTE, datastore).value shouldBe createData.drop(1)
+      }
+      "be correct for GT" in {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        runScan(GT, datastore).value shouldBe createData.drop(2)
+      }
+      "be correct for LT" in {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        runScan(LT, datastore).value shouldBe createData.take(1)
+      }
+      "be correct for LTE" in {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        runScan(LTE, datastore).value shouldBe createData.take(2)
+      }
+      "be correct for EQ" in {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        runScan(EQ, datastore).value shouldBe createData.drop(1).take(1)
+      }
     }
   }
 }

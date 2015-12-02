@@ -16,8 +16,9 @@ import scalaz.stream.Process
 import com.couchbase.client.java.{ Bucket, AsyncBucket }
 import com.couchbase.client.java.document.{ AbstractDocument, JsonLongDocument, RawJsonDocument }
 import com.couchbase.client.java.error._
-import com.couchbase.client.java.query.N1qlQuery
+import com.couchbase.client.java.query.{ N1qlQuery, N1qlParams }
 import com.couchbase.client.java.document.json._ //Need all the Json types
+import com.couchbase.client.java.query.consistency.{ ScanConsistency => CScanConsistency }
 
 // RxScala (Observables) used in Couchbase client lib async calls
 import rx.lang.scala.Observable
@@ -48,7 +49,6 @@ final case class CouchDatastore(bucket: Task[Bucket]) extends Datastore {
  */
 final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
   type CouchK[A] = Kleisli[Task, Bucket, A]
-  private[this] final val BoundedQueueSize = 10000
 
   private[this] final val MetaString = "meta"
   private[this] final val RecordString = "record"
@@ -82,19 +82,24 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       case IncrementCounter(k: Key, delta: Long) => incrementCounter(k, delta)
       case RemoveKey(k: Key) => removeKey(k)
       case UpdateDoc(k: Key, v: RawJsonString, cv: CommitVersion) => updateDoc(k, v, cv)
-      case ScanKeys(op: Comparison, value: String) => Kleisli.kleisli(scanKeys(op, value).map(_.right.point[Task]))
+      case ScanKeys(op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency) =>
+        scanKeys(op, value, limit, offset, consistency)
     }
 
-    private def scanField(field: String, op: Comparison, value: String): Bucket => Process[Task, DBValue] = { bucket: Bucket =>
-      val query = createStatement(bucket.name, field, op, value)
-      observableToProcess(bucket.async.query(query)).flatMap(result => observableToProcess(result.rows)).flatMap { row =>
-        logger.debug("Recieved row" + row.value.toString)
-        val maybeMetadata = Option(row.value.getObject(MetaString)).flatMap(extractFromMeta(_))
-        val (keyString, cas, typ) = maybeMetadata.getOrElse(throw new Exception(s"${row.value.toString} was screwed up in a way we couldn't understand at all."))
-        val maybeStringifiedValue = getJsonString(row.value.get(RecordString), typ)
-        maybeStringifiedValue.map { result =>
-          Process.emit(DBDocument[RawJsonString](Key(keyString), CommitVersion(cas), RawJsonString(result)))
-        }.getOrElse(Process.empty) //Flatten things we can't deal with out of existence.
+    private def processQuery(queryCreator: String => N1qlQuery): CouchK[DBError \/ List[DBValue]] = Kleisli.kleisli { bucket: Bucket =>
+      observableToSingleItem(bucket.async.query(queryCreator(bucket.name))).flatMap {
+        case None => Task.now(GeneralError(new Exception("missing result?")).left)
+        case Some(result) =>
+          println("Here")
+          observableToList(result.errors).run.foreach(println(_))
+
+          observableToList(result.rows).map(_.flatMap { row =>
+            logger.debug("Recieved row" + row.value.toString)
+            val maybeMetadata = Option(row.value.getObject(MetaString)).flatMap(extractFromMeta(_))
+            val (keyString, cas, typ) = maybeMetadata.getOrElse(throw new Exception(s"${row.value.toString} was screwed up in a way we couldn't understand at all."))
+            val maybeStringifiedValue = getJsonString(row.value.get(RecordString), typ)
+            maybeStringifiedValue.map(result => DBDocument[RawJsonString](Key(keyString), CommitVersion(cas), RawJsonString(result)))
+          }.right)
       }
     }
 
@@ -111,7 +116,8 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
     private def getJsonString(couchbaseObject: Any, fieldType: String): Option[String] = fieldType match {
       case "json" =>
         couchbaseObject match {
-          case v: String => v.toString.some
+          //We have to surround the string with " to make it valid Json again.
+          case v: String => ("\"" + v.toString + "\"").some
           case v: Integer => v.toString.some
           case v: Long => v.toString.some
           case v: Double => v.toString.some
@@ -122,12 +128,17 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
             throw new Exception(s"All Json types should be covered, but found '$x'")
         }
       case typ =>
-        logger.warn(s"Was asked to decode json, but found '$typ'.")
+        logger.warn(s"We only know how to decode json, but we were asked to decode $fieldType. Threw '$couchbaseObject' out.")
         None
     }
 
-    private def scanKeys(op: Comparison, value: String): Bucket => Process[Task, DBValue] =
-      scanField(s"meta($RecordString).id", op, value)
+    private def scanField(field: String, op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency) = {
+      val queryCreator = createStatement(_: String, field, op, value, limit, offset, consistency)
+      processQuery(queryCreator)
+    }
+
+    private def scanKeys(op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency) =
+      scanField(s"meta($RecordString).id", op, value, limit, offset, consistency)
 
     private def opToFunc(op: Comparison)(name: String): String = {
       val string = op match {
@@ -140,11 +151,23 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       name + string + "$1"
     }
 
-    private def createStatement(bucketName: String, field: String, op: Comparison, value: String): N1qlQuery = {
+    //COLT probably shouldn't assert.
+    private def createStatement(bucketName: String, field: String, op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency): N1qlQuery = {
+      // assert(limit >= 0, "Couchbase will cut me if I ask for limit < 0")
+      // assert(offset >= 0, "Couchbase will cut me if I ask for offset < 0")
+
       import scala.collection.JavaConverters._
-      val queryString = s"SELECT $RecordString, meta($RecordString) as $MetaString FROM $bucketName $RecordString where ${opToFunc(op)(field)};"
+      val queryString = s"SELECT $RecordString, meta($RecordString) as $MetaString FROM $bucketName $RecordString where ${opToFunc(op)(field)} limit $limit offset $offset;"
       logger.debug(s"Query created: '$queryString' with $value")
-      N1qlQuery.parameterized(queryString, JsonArray.from(List(value).asJava))
+      N1qlQuery.parameterized(queryString, JsonArray.from(List(value).asJava), createN1qlParams(consistency))
+    }
+
+    private def createN1qlParams(c: ScanConsistency): N1qlParams = {
+      val params = N1qlParams.build
+      c match {
+        case AllowStale => params.consistency(CScanConsistency.NOT_BOUNDED)
+        case EnsureConsistency => params.consistency(CScanConsistency.REQUEST_PLUS)
+      }
     }
 
     /*
@@ -216,17 +239,16 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       headOptionTask.map(_.toRightDisjunction(new DocumentDoesNotExistException())).attempt.map(_.join)
     }
 
-    private def observableToProcess[A](o: Observable[A]): Process[Task, A] = {
-      val queue = async.boundedQueue[A](BoundedQueueSize, true)
-      o.subscribe(
-        n => queue.enqueueOne(n).run,
-        { ex =>
-          logger.error("Error retrieving value from couchbase.", ex)
-          queue.kill.run
-        },
-        () => queue.close.run
-      )
-      queue.dequeue
+    private def observableToList[A](o: Observable[A]): Task[List[A]] = {
+      Task.async[List[A]](f => {
+        o.toList.subscribe(
+          n => f(n.right),
+          e => f(e.left),
+          () => ()
+        )
+        ()
+      })
     }
+
   }
 }

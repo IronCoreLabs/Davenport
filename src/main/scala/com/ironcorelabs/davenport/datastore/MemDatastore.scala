@@ -134,8 +134,8 @@ object MemDatastore {
         }
         case GetCounter(k) => getCounter(k)
         case IncrementCounter(k, delta) => incrementCounter(k, delta)
-        case ScanKeys(comparison, value) => state { map =>
-          map -> scalaz.stream.Process.emitAll(findRecords(comparison, value)(map)).right
+        case ScanKeys(comparison, value, limit, offset, _) => state { map =>
+          map -> findRecords(comparison, value)(map).drop(offset).take(limit).sortBy(_.key).right
         }
       }
     }

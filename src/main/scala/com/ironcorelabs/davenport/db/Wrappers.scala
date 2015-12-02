@@ -10,7 +10,8 @@ import scalaz.std.string._
 final case class Key(value: String) extends AnyVal
 
 object Key {
-  implicit final val OrderInstance = scalaz.Order[String].contramap[Key](_.value)
+  implicit final val OrderInstance: Order[Key] = Order[String].contramap[Key](_.value)
+  implicit final val OrderingInstance: scala.math.Ordering[Key] = OrderInstance.toScalaOrdering
 }
 
 /** Just a string. This is used for type safety. */

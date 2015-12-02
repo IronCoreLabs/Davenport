@@ -49,8 +49,8 @@ package object db {
   def incrementCounter(k: Key, delta: Long = 1): DBProg[Long] =
     liftToFreeEitherT(IncrementCounter(k, delta))
 
-  def scanKeys(op: Comparison, value: String): DBProg[scalaz.stream.Process[Task, DBValue]] =
-    liftToFreeEitherT(ScanKeys(op, value))
+  def scanKeys(op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency): DBProg[List[DBValue]] =
+    liftToFreeEitherT(ScanKeys(op, value, limit, offset, consistency))
   //
   // Common combinators for DBProg
   //
