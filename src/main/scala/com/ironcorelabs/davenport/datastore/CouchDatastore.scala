@@ -50,12 +50,12 @@ final case class CouchDatastore(bucket: Task[Bucket]) extends Datastore {
 final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
   type CouchK[A] = Kleisli[Task, Bucket, A]
 
-  private[this] final val MetaString = "meta"
-  private[this] final val RecordString = "record"
+  private final val MetaString = "meta"
+  private final val RecordString = "record"
   //These are constants that match couchbase fields
-  private[this] final val IdString = "id"
-  private[this] final val CasString = "cas"
-  private[this] final val TypeString = "type"
+  private final val IdString = "id"
+  private final val CasString = "cas"
+  private final val TypeString = "type"
 
   /**
    * Interpret the program into a Kleisli that will take a Bucket as its argument. Useful if you want to do
@@ -90,9 +90,7 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       observableToSingleItem(bucket.async.query(queryCreator(bucket.name))).flatMap {
         case None => Task.now(GeneralError(new Exception("missing result?")).left)
         case Some(result) =>
-          println("Here")
-          observableToList(result.errors).run.foreach(println(_))
-
+          //TODO zip errors 
           observableToList(result.rows).map(_.flatMap { row =>
             logger.debug("Recieved row" + row.value.toString)
             val maybeMetadata = Option(row.value.getObject(MetaString)).flatMap(extractFromMeta(_))
@@ -151,13 +149,9 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       name + string + "$1"
     }
 
-    //COLT probably shouldn't assert.
     private def createStatement(bucketName: String, field: String, op: Comparison, value: String, limit: Int, offset: Int, consistency: ScanConsistency): N1qlQuery = {
-      // assert(limit >= 0, "Couchbase will cut me if I ask for limit < 0")
-      // assert(offset >= 0, "Couchbase will cut me if I ask for offset < 0")
-
       import scala.collection.JavaConverters._
-      val queryString = s"SELECT $RecordString, meta($RecordString) as $MetaString FROM $bucketName $RecordString where ${opToFunc(op)(field)} limit $limit offset $offset;"
+      val queryString = s"SELECT $RecordString, meta($RecordString) as $MetaString FROM $bucketName $RecordString where ${opToFunc(op)(field)} order by $MetaString.id limit $limit offset $offset ;"
       logger.debug(s"Query created: '$queryString' with $value")
       N1qlQuery.parameterized(queryString, JsonArray.from(List(value).asJava), createN1qlParams(consistency))
     }

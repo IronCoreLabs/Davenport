@@ -216,8 +216,13 @@ abstract class DatastoreSpec extends TestBase {
       res.toList.separate._2.length shouldBe 5
     }
 
-    "handle scans" should {
+    "Datastore scans" should {
       import argonaut._, Argonaut._
+      def printThreadId(name: String) = println(name + ": " + Thread.currentThread().getId())
+      def printTime(label: String) = {
+        val t = System.nanoTime
+        println(label + ": " + t.toString)
+      }
       case class Test(string: String, enabled: Boolean)
       implicit val codec: CodecJson[Test] = CodecJson.derive[Test]
       val Seq(k1, k2, k3) = tenrows.take(3).map(_._1)
@@ -225,8 +230,8 @@ abstract class DatastoreSpec extends TestBase {
       val createData = List(k1 -> RawJsonString(t1.jencode.nospaces), k2 -> RawJsonString("blah".jencode.nospaces), k3 -> RawJsonString(0L.jencode.nospaces))
       val creates = createData.traverseU { case (key, value) => createDoc(key, value) }
 
-      def runScan(c: Comparison, d: Datastore): DBError \/ List[(Key, RawJsonString)] = {
-        val resultDisjunction = scanKeys(c, k2.value, -100, -1, EnsureConsistency).execute(d).attemptRun.value
+      def runScan(c: Comparison, d: Datastore, offset: Int = 0): DBError \/ List[(Key, RawJsonString)] = {
+        val resultDisjunction = scanKeys(c, k2.value, 4, offset, EnsureConsistency).execute(d).attemptRun.value
         resultDisjunction.map(_.sortBy(_.key).map(r => r.key -> r.data))
       }
       "be correct for GTE" in {
@@ -253,6 +258,11 @@ abstract class DatastoreSpec extends TestBase {
         val datastore = emptyDatastore
         creates.execute(datastore).attemptRun.value
         runScan(EQ, datastore).value shouldBe createData.drop(1).take(1)
+      }
+      "be correct for GTE with offset" in {
+        val datastore = emptyDatastore
+        println(creates.execute(datastore).attemptRun.value)
+        runScan(GTE, datastore, 1).value shouldBe createData.drop(1 + 1)
       }
     }
   }
