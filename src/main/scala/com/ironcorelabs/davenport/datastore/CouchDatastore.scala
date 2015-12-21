@@ -24,6 +24,7 @@ import com.couchbase.client.java.query.consistency.{ ScanConsistency => CScanCon
 import rx.lang.scala.Observable
 import rx.lang.scala.JavaConversions._
 import scalaz.stream.async
+import util.observable
 
 /**
  * Create a CouchDatastore which operates on the bucket provided. Note that the primary way this should be used is through
@@ -87,11 +88,11 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
     }
 
     private def processQuery(queryCreator: String => N1qlQuery): CouchK[DBError \/ List[DBValue]] = Kleisli.kleisli { bucket: Bucket =>
-      observableToSingleItem(bucket.async.query(queryCreator(bucket.name))).flatMap {
+      observable.toSingleItemTask(bucket.async.query(queryCreator(bucket.name))).flatMap {
         case None => Task.now(GeneralError(new Exception("missing result?")).left)
         case Some(result) =>
           //TODO zip errors 
-          observableToList(result.rows).map(_.flatMap { row =>
+          observable.toListTask(result.rows).map(_.flatMap { row =>
             logger.debug("Recieved row" + row.value.toString)
             val maybeMetadata = Option(row.value.getObject(MetaString)).flatMap(extractFromMeta(_))
             val (keyString, cas, typ) = maybeMetadata.getOrElse(throw new Exception(s"${row.value.toString} was screwed up in a way we couldn't understand at all."))
@@ -232,17 +233,5 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
       //and then we need to flatten the nested disjunctions.
       headOptionTask.map(_.toRightDisjunction(new DocumentDoesNotExistException())).attempt.map(_.join)
     }
-
-    private def observableToList[A](o: Observable[A]): Task[List[A]] = {
-      Task.async[List[A]](f => {
-        o.toList.subscribe(
-          n => f(n.right),
-          e => f(e.left),
-          () => ()
-        )
-        ()
-      })
-    }
-
   }
 }
