@@ -10,7 +10,6 @@ import scalaz.{ \/, Kleisli, ~>, Free }
 import scalaz.concurrent.Task
 import scalaz.Scalaz._
 import db._
-import scalaz.stream.Process
 
 // Couchbase
 import com.couchbase.client.java.{ Bucket, AsyncBucket }
@@ -24,7 +23,7 @@ import com.couchbase.client.java.query.consistency.{ ScanConsistency => CScanCon
 import rx.lang.scala.Observable
 import rx.lang.scala.JavaConversions._
 import scalaz.stream.async
-import util.observable
+import util.observable.{ toSingleItemTask, toListTask }
 
 /**
  * Create a CouchDatastore which operates on the bucket provided. Note that the primary way this should be used is through
@@ -51,12 +50,12 @@ final case class CouchDatastore(bucket: Task[Bucket]) extends Datastore {
 final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
   type CouchK[A] = Kleisli[Task, Bucket, A]
 
-  private final val MetaString = "meta"
-  private final val RecordString = "record"
+  final val MetaString = "meta"
+  final val RecordString = "record"
   //These are constants that match couchbase fields
-  private final val IdString = "id"
-  private final val CasString = "cas"
-  private final val TypeString = "type"
+  final val IdString = "id"
+  final val CasString = "cas"
+  final val TypeString = "type"
 
   /**
    * Interpret the program into a Kleisli that will take a Bucket as its argument. Useful if you want to do
@@ -88,11 +87,11 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
     }
 
     private def processQuery(queryCreator: String => N1qlQuery): CouchK[DBError \/ List[DBValue]] = Kleisli.kleisli { bucket: Bucket =>
-      observable.toSingleItemTask(bucket.async.query(queryCreator(bucket.name))).flatMap {
+      toSingleItemTask(bucket.async.query(queryCreator(bucket.name))).flatMap {
         case None => Task.now(GeneralError(new Exception("missing result?")).left)
         case Some(result) =>
           //TODO zip errors 
-          observable.toListTask(result.rows).map(_.flatMap { row =>
+          toListTask(result.rows).map(_.flatMap { row =>
             logger.debug("Recieved row" + row.value.toString)
             val maybeMetadata = Option(row.value.getObject(MetaString)).flatMap(extractFromMeta(_))
             val (keyString, cas, typ) = maybeMetadata.getOrElse(throw new Exception(s"${row.value.toString} was screwed up in a way we couldn't understand at all."))
