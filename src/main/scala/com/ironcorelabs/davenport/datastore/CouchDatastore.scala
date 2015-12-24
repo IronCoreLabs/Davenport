@@ -111,11 +111,11 @@ final object CouchDatastore extends com.typesafe.scalalogging.StrictLogging {
         typ <- Option(meta.getString(TypeString))
       } yield (key, cas, typ)
 
-    private def getJsonString(couchbaseObject: Any, fieldType: String): Option[String] = fieldType match {
+    private def getJsonString[A](couchbaseObject:A, fieldType: String): Option[String] = fieldType match {
       case "json" =>
         couchbaseObject match {
           //We have to surround the string with " to make it valid Json again.
-          case v: String => ("\"" + v.toString + "\"").some
+          case v: String => ("\"" + v + "\"").some
           case v: Integer => v.toString.some
           case v: Long => v.toString.some
           case v: Double => v.toString.some

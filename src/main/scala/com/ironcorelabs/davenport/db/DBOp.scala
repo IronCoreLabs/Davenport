@@ -4,7 +4,6 @@
 package com.ironcorelabs.davenport.db
 
 import scalaz.\/
-import scalaz.concurrent.Task
 
 /** Any database operation must be represented by a `DBOp` */
 sealed trait DBOp[A]
