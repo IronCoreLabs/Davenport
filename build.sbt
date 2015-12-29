@@ -14,10 +14,11 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "org.scalaz" %% "scalaz-core" % ScalazVersion, // for type awesomeness
   "org.scalaz" %% "scalaz-concurrent" % ScalazVersion, // for type awesomeness
-  "com.couchbase.client" % "java-client" % "2.1.4", // interacting with couch
+  "com.couchbase.client" % "java-client" % "2.2.0", // interacting with couch
   "io.reactivex" %% "rxscala" % "0.25.0", // to better work with the couchbase java client
   "io.argonaut" %% "argonaut" % "6.1", // json (de)serialization scalaz style
-  "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a"
+  "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
 )
 
 // Test
@@ -29,7 +30,7 @@ libraryDependencies ++= Seq(
   "oncue.knobs" %% "core" % "3.3.3" % "test"
 )
 
-addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.6.3")
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.7.1")
 
 // Code coverage checks
 coverageMinimum := 70

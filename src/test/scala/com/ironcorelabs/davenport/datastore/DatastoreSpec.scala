@@ -170,7 +170,7 @@ abstract class DatastoreSpec extends TestBase {
     "show partial success will still change the backing store" in {
       val datastore = emptyDatastore
       val createOne = createAndGet(k, v)
-      val k2 = Key("something.")
+      val k2 = tenrows.head._1
       val v2 = RawJsonString("thisIsValue")
       val createTwo = createAndGet(k2, v2)
       //Setup the backing store
@@ -214,6 +214,65 @@ abstract class DatastoreSpec extends TestBase {
       val res = runProcess(batch.createDocs(tenrows.drop(5))).value
       res.length shouldBe 5
       res.toList.separate._2.length shouldBe 5
+    }
+
+    "Datastore scans" should {
+      import argonaut._, Argonaut._
+      //Create some 
+      case class Test(string: String, enabled: Boolean)
+      implicit val codec: CodecJson[Test] = CodecJson.derive[Test]
+      val Seq(k1, k2, k3) = tenrows.take(3).map(_._1)
+      val t1 = Test("blah", true)
+      val createData = List(k1 -> RawJsonString(t1.jencode.nospaces), k2 -> RawJsonString("blah".jencode.nospaces), k3 -> RawJsonString(0.jencode.nospaces))
+      val creates1 = createData.traverseU { case (key, value) => createDoc(key, value) }
+
+      def createSingleAndScan(creates: DBProg[DBValue], c: Comparison, offset: Int = 0): DBError \/ (Key, RawJsonString) =
+        createAndScan(creates.map(List(_)), c, offset).map(_.headOption.value)
+
+      def createAndScan(creates: DBProg[List[DBValue]], c: Comparison, offset: Int = 0): DBError \/ List[(Key, RawJsonString)] = {
+        val datastore = emptyDatastore
+        creates.execute(datastore).attemptRun.value
+        val resultDisjunction = scanKeys(c, k2.value, 4, offset, EnsureConsistency).execute(datastore).attemptRun.value
+        resultDisjunction.map(_.sortBy(_.key).map(r => r.key -> r.data))
+      }
+      /**
+       * All Scans are using k1, k2, k3 as data with k2 as the "comparison point". k1-k3 should
+       */
+      "be correct for GTE" in { createAndScan(creates1, GTE).value shouldBe createData.drop(1) }
+      "be correct for GT" in { createAndScan(creates1, GT).value shouldBe createData.drop(2) }
+      "be correct for LT" in { createAndScan(creates1, LT).value shouldBe createData.take(1) }
+      "be correct for LTE" in { createAndScan(creates1, LTE).value shouldBe createData.take(2) }
+      "be correct for EQ" in { createAndScan(creates1, EQ).value shouldBe createData.drop(1).take(1) }
+      "be correct for GTE with offset" in { createAndScan(creates1, GTE, 1).value shouldBe createData.drop(1 + 1) }
+
+      "handle JsonArray[Boolean]" in {
+        val jsonData = RawJsonString(List(true, false).jencode.nospaces)
+        val (key, value) = createSingleAndScan(createDoc(k2, jsonData), EQ).value
+        key shouldBe k2
+        value shouldBe jsonData
+      }
+
+      "handle Double" in {
+        val jsonData = RawJsonString(100.01d.jencode.nospaces)
+        val (key, value) = createSingleAndScan(createDoc(k2, jsonData), EQ).value
+        key shouldBe k2
+        value shouldBe jsonData
+      }
+
+      "handle Long" in {
+        val l = Long.MaxValue
+        val jsonData = RawJsonString(l.jencode.nospaces)
+        val (key, value) = createSingleAndScan(createDoc(k2, jsonData), EQ).value
+        key shouldBe k2
+        println(value)
+        value.value.decode[Long].value shouldBe l
+      }
+      "handle Boolean" in {
+        val jsonData = RawJsonString(true.jencode.nospaces)
+        val (key, value) = createSingleAndScan(createDoc(k2, jsonData), EQ).value
+        key shouldBe k2
+        value shouldBe jsonData
+      }
     }
   }
 }

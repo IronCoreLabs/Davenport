@@ -3,8 +3,16 @@
 //
 package com.ironcorelabs.davenport.db
 
+import scalaz.Order
+import scalaz.std.string._
+
 /** Just a string. This is used for type safety. */
 final case class Key(value: String) extends AnyVal
+
+object Key {
+  implicit final val OrderInstance: Order[Key] = Order[String].contramap[Key](_.value)
+  implicit final val OrderingInstance: scala.math.Ordering[Key] = OrderInstance.toScalaOrdering
+}
 
 /** Just a string. This is used for type safety. */
 final case class RawJsonString(value: String) extends AnyVal
