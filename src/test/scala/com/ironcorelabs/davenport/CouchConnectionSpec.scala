@@ -13,7 +13,6 @@ import scala.concurrent.duration._
 class CouchConnectionSpec extends TestBase with KnobsConfiguration {
   var connection: CouchConnection = null
 
-  val davenportConfig = knobsConfiguration.run
   override def beforeAll() = {
 
     connection = CouchConnection(davenportConfig)

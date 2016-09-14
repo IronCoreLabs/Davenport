@@ -16,7 +16,6 @@ import org.scalatest.BeforeAndAfter
 @RequiresCouch
 class CouchDatastoreSpec extends DatastoreSpec with BeforeAndAfter with KnobsConfiguration {
   def datastoreName: String = "CouchDatastoreBasicTests"
-  val davenportConfig = knobsConfiguration.run
   var connection: CouchConnection = null
   def emptyDatastore: Datastore = connection.openDatastore(BucketNameAndPassword("default", None))
 

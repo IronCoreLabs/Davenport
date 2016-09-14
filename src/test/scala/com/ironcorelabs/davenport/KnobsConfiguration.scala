@@ -3,21 +3,22 @@
 //
 package com.ironcorelabs.davenport
 
-import knobs.{ Required, Optional, FileResource, Config, ClassPathResource }
 import java.io.File
 
-import scalaz.concurrent.Task
+import pureconfig._
+import scalaz.NonEmptyList
 
 /**
  * Mix this in if you need configuration from knobs for your test.
  */
 trait KnobsConfiguration {
-  private final def configFileName = "davenport-test.cfg"
-  private lazy val config: Task[Config] = knobs.loadImmutable(List(Required(ClassPathResource(configFileName))))
-  protected lazy val knobsConfiguration: Task[DavenportConfig] = config.map { cfg =>
-    DavenportConfig.withDefaults().
-      setIOPoolSize(cfg.lookup[Int]("cdb.ioPoolSize")).
-      setComputationPoolSize(cfg.lookup[Int]("cdb.computationPoolSize")).
-      setHosts(cfg.lookup[String]("cdb.host").toList) //Only support 1 value for host
-  }
+  case class Foo(bar: DavenportConfig)
+  private final def configFilePath = new java.io.File("src/test/resources/davenport-test.cfg").toPath
+  def stringToNel(s: String): NonEmptyList[String] =
+    s.split(",").toList match {
+      case Nil => throw new Exception("Need 1 entry")
+      case hd :: tail => NonEmptyList.nel(hd, tail)
+    }
+  implicit val nelConfig = StringConvert.fromUnsafe[NonEmptyList[String]](stringToNel(_), nel => nel.list.mkString(","))
+  lazy val davenportConfig: DavenportConfig = loadConfig[DavenportConfig](configFilePath).getOrElse(throw new Exception("No config found."))
 }

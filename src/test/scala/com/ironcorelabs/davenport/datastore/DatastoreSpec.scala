@@ -158,7 +158,7 @@ abstract class DatastoreSpec extends TestBase {
 
     "show Process[Task] coming together with Process[DBOps]" in {
       val dataStream = Process.eval(Task.now(k -> v))
-      val task: Task[IndexedSeq[DBError \/ RawJsonString]] = dataStream.flatMap {
+      val task: Task[Vector[DBError \/ RawJsonString]] = dataStream.flatMap {
         case (key, value) =>
           createDoc(key, value).map(_.data).process.execute(emptyDatastore)
       }.runLog

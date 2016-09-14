@@ -1,6 +1,6 @@
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
-val ScalazVersion = "7.1.5"
+val ScalazVersion = "7.1.9"
 
 // crossScalaVersions := Seq("2.10.4")
 
@@ -17,7 +17,7 @@ libraryDependencies ++= Seq(
   "com.couchbase.client" % "core-io" % "1.2.3",
   "io.reactivex" %% "rxscala" % "0.25.0", // to better work with the couchbase java client
   "io.argonaut" %% "argonaut" % "6.1", // json (de)serialization scalaz style
-  "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.8.4",
   "org.scodec" %% "scodec-bits" % "1.1.1"
 )
 
@@ -27,7 +27,7 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "scalaz-scalatest" % "0.2.2" % "test",
   "org.scalacheck" %% "scalacheck" % "1.12.5" % "test",
   "org.scalaz" %% "scalaz-scalacheck-binding" % ScalazVersion,
-  "oncue.knobs" %% "core" % "3.3.3" % "test"
+  "com.github.melrief" %% "pureconfig" % "0.2.2" % "test"
 )
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.6.3")
