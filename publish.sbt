@@ -1,20 +1,16 @@
 name := "davenport"
 
+homepage := Some(url("https://ironcorelabs.com/davenport"))
+
 organization := "com.ironcorelabs"
 
 publishMavenStyle := true
 
 publishArtifact in Test := false
 
-// homepage := Some(url("https://ironcorelabs.com/davenport"))
-
 pomIncludeRepository := { _ => false }
 
 useGpg := true
-
-// useGpgAgent := false
-
-// PgpKeys.gpgCommand := "/usr/local/MacGPG2/bin/gpg2"
 
 usePgpKeyHex("E84BBF42")
 
@@ -55,3 +51,21 @@ pomExtra := (
     }
     </developers>
   )
+
+import ReleaseTransformations._
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  ReleaseStep(action = Command.process("publishSigned", _), enableCrossBuild = true),
+  setNextVersion,
+  commitNextVersion,
+  ReleaseStep(action = Command.process("sonatypeReleaseAll", _), enableCrossBuild = true),
+  pushChanges
+)
+
