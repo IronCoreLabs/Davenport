@@ -16,7 +16,8 @@ final case class DavenportConfig(
     ioPoolSize: Int,
     computationPoolSize: Int,
     kvEndpoints: Int,
-    hosts: NonEmptyList[String]) {
+    hosts: NonEmptyList[String]
+) {
   private def setConfig[A](opt: Option[A], copy: A => DavenportConfig): DavenportConfig = {
     opt.map(copy(_)).getOrElse(this)
   }
@@ -51,7 +52,8 @@ final object DavenportConfig {
     poolSize: Int = DefaultIOPoolSize,
     computationPoolSize: Int = DefaultComputationPoolSize,
     kvEndpoints: Int = DefaultKeyValueEndpoints,
-    hosts: NonEmptyList[String] = NonEmptyList.nels("127.0.0.1")): DavenportConfig =
+    hosts: NonEmptyList[String] = NonEmptyList.nels("127.0.0.1")
+  ): DavenportConfig =
     DavenportConfig(poolSize, computationPoolSize, kvEndpoints, hosts)
   private final val DefaultIOPoolSize: Int = 4
   private final val DefaultComputationPoolSize: Int = 4

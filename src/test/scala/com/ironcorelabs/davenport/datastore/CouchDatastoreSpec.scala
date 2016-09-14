@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import org.scalatest.BeforeAndAfter
 
 @RequiresCouch
-class CouchDatastoreSpec extends DatastoreSpec with BeforeAndAfter with KnobsConfiguration {
+class CouchDatastoreSpec extends DatastoreSpec with BeforeAndAfter with DavenportTestConfiguration {
   def datastoreName: String = "CouchDatastoreBasicTests"
   var connection: CouchConnection = null
   def emptyDatastore: Datastore = connection.openDatastore(BucketNameAndPassword("default", None))

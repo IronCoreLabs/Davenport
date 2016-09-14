@@ -10,7 +10,7 @@ import syntax.dbprog._
 import scala.concurrent.duration._
 
 @RequiresCouch
-class CouchConnectionSpec extends TestBase with KnobsConfiguration {
+class CouchConnectionSpec extends TestBase with DavenportTestConfiguration {
   var connection: CouchConnection = null
 
   override def beforeAll() = {

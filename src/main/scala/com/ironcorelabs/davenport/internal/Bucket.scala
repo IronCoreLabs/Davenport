@@ -125,7 +125,8 @@ private object Bucket {
   private def toByteVectorWithCustomErrorHandling(
     id: String,
     bucket: String,
-    res: AbstractKeyValueResponse)(specialErrorHandler: PartialFunction[ResponseStatus, CouchbaseError]): Task[ByteVector] =
+    res: AbstractKeyValueResponse
+  )(specialErrorHandler: PartialFunction[ResponseStatus, CouchbaseError]): Task[ByteVector] =
     processResponse(id, bucket, res) { res => readBytes(res.content) }(specialErrorHandler)
 
   private def toByteVector(id: String, bucket: String, res: AbstractKeyValueResponse): Task[ByteVector] =
@@ -138,7 +139,8 @@ private object Bucket {
   private def processResponse[A](
     id: String,
     bucket: String,
-    res: AbstractKeyValueResponse)(onSuccess: AbstractKeyValueResponse => A)(specialErrorHandler: PartialFunction[ResponseStatus, CouchbaseError]): Task[A] = { //scalastyle:ignore
+    res: AbstractKeyValueResponse
+  )(onSuccess: AbstractKeyValueResponse => A)(specialErrorHandler: PartialFunction[ResponseStatus, CouchbaseError]): Task[A] = { //scalastyle:ignore
     //Important that all of these eagerly consume res.content if they need it. It's freed immediately after this match.
     val status = res.status()
     val maybeHandledError = specialErrorHandler.lift(status).map(Task.fail(_))
