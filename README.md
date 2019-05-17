@@ -6,6 +6,12 @@
 [![Stories In Progress](https://badge.waffle.io/IronCoreLabs/davenport.svg?label=in%20progress&title=In%20Progress)](http://waffle.io/IronCoreLabs/davenport)
 [![scaladoc](https://javadoc-badge.appspot.com/com.ironcorelabs/davenport_2.11.svg?label=scaladoc)](https://javadoc-badge.appspot.com/com.ironcorelabs/davenport_2.11)
 
+# ARCHIVED
+Active development on this project has stopped.
+
+Alternatives:
+- [Official SDK](https://docs.couchbase.com/scala-sdk/1.0/start-using-sdk.html)
+- projects mentioned below
 
 # Davenport - A principled Couchbase library for Scala
 
