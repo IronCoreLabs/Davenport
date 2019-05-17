@@ -27,7 +27,8 @@ These are perfectly good libraries and you should evaluate them.  This library t
 
 ---
 
-Copyright (c) 2015 IronCore Labs
+Copyright (c) 2015-present IronCore Labs
+All rights reserved.
 
 Licensed under the [MIT Open Source License](http://opensource.org/licenses/MIT)
 
